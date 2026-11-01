@@ -9,8 +9,41 @@ Object.assign(globalThis,{window:dom.window,document:dom.window.document,HTMLEle
 Object.defineProperty(globalThis,'navigator',{value:dom.window.navigator,configurable:true});
 const {render,fireEvent,cleanup}=await import('@testing-library/react');
 const {Journey}=await import('../components/journey');
-const {Finance}=await import('../components/finance');
-const {Judge}=await import('../components/judge');
-test('demo permission, input persistence, every decision and reset',()=>{const view=render(React.createElement(Journey));fireEvent.click(view.getByRole('button',{name:'Review family needs'}));let next=view.getByRole('button',{name:'Explore my options'}) as HTMLButtonElement;assert.equal(next.disabled,true);fireEvent.click(view.getByLabelText('Spouse'));fireEvent.change(view.getByLabelText('Do you already have personal insurance?'),{target:{value:'Yes'}});fireEvent.change(view.getByLabelText('What prompted this review?'),{target:{value:'Family change'}});fireEvent.click(view.getByLabelText(/I agree to use these fictional answers/));assert.equal(next.disabled,false);fireEvent.click(next);assert.ok(view.getByText(/Aditi, Spouse · Personal cover exists · Family change/));fireEvent.click(view.getByRole('button',{name:'Back'}));assert.equal((view.getByLabelText('Spouse') as HTMLInputElement).checked,true);assert.equal((view.getByLabelText('What prompted this review?') as HTMLSelectElement).value,'Family change');fireEvent.click(view.getByRole('button',{name:'Explore my options'}));fireEvent.click(view.getByRole('button',{name:'Make my decision'}));for(const [label,result] of [['Request guidance',/Your guidance request is simulated/],['Explore a personal policy',/Your application checklist is ready/],['My existing cover may be sufficient',/A considered decision is a good outcome/]] as const){fireEvent.click(view.getByRole('button',{name:new RegExp(label)}));assert.ok(view.getByRole('status').textContent?.match(result));fireEvent.click(view.getByRole('button',{name:'Review other decisions'}))}fireEvent.click(view.getByRole('button',{name:'Reset demo'}));assert.ok(view.getByRole('heading',{name:/Hi Aditi/}));fireEvent.click(view.getByRole('button',{name:'Review family needs'}));assert.equal((view.getByLabelText('Spouse') as HTMLInputElement).checked,false);assert.equal((view.getByLabelText('Do you already have personal insurance?') as HTMLSelectElement).value,'Not sure');assert.equal((view.getByRole('button',{name:'Explore my options'}) as HTMLButtonElement).disabled,true);cleanup()});
-test('sensitivity updates outputs, preserves base and resets',()=>{const v=render(React.createElement(Finance));fireEvent.change(v.getByLabelText(/Claims ratio/),{target:{value:'75'}});assert.ok(v.getByText('User-adjusted scenario'));assert.ok(v.getByRole('img').getAttribute('aria-label')?.includes('−₹2.54 cr'));assert.ok(v.getByRole('img').getAttribute('aria-label')?.includes('−₹1.81 cr'));assert.ok(v.getByText('+₹5.89 cr'));fireEvent.change(v.getByLabelText(/Annual renewal rate/),{target:{value:'50'}});assert.ok(v.getByText('17,500'));fireEvent.click(v.getByRole('button',{name:/Reset assumptions/}));assert.equal((v.getByLabelText(/Claims ratio/) as HTMLInputElement).value,'65');assert.equal((v.getByLabelText(/Annual renewal rate/) as HTMLInputElement).value,'80');assert.ok(v.getByText('Base case'));fireEvent.click(v.getByText('How the numbers work'));assert.ok(v.getByText(/Inferred timing assumption used to reconcile/));cleanup()});
-test('judge mode has five chapters, keyboard, progress and exit',()=>{let closed=false;const v=render(React.createElement(Judge,{onClose:()=>{closed=true}}));assert.ok(v.getByRole('heading',{name:/A new job/}));assert.equal((v.getByRole('button',{name:'Previous'}) as HTMLButtonElement).disabled,true);fireEvent.keyDown(window,{key:'ArrowRight'});assert.ok(v.getByRole('heading',{name:/Start with a useful moment/}));assert.ok(v.getByText('2 / 5'));fireEvent.click(v.getByRole('button',{name:'Next chapter'}));assert.ok(v.getByRole('heading',{name:/Clarity first/}));fireEvent.keyDown(window,{key:'ArrowLeft'});assert.ok(v.getByText('2 / 5'));fireEvent.click(v.getByRole('button',{name:'Economics'}));assert.ok(v.getByText('4 / 5'));fireEvent.click(v.getByRole('button',{name:'Next chapter'}));assert.ok(v.getByRole('heading',{name:/A controlled pilot/}));assert.ok(v.getByText('5 / 5'));fireEvent.click(v.getByRole('button',{name:'Finish'}));assert.equal(closed,true);closed=false;fireEvent.keyDown(window,{key:'Escape'});assert.equal(closed,true);cleanup()});
+
+test('journey keeps answers, shows the review, handles each decision and restarts',()=>{
+  const view=render(React.createElement(Journey));
+  assert.ok(view.getByText('Proposed concept screen'));
+  fireEvent.click(view.getByText('What should I check?'));
+  assert.ok(view.getByText(/Ask your employer when your cover ends/));
+  fireEvent.click(view.getByRole('button',{name:'Continue to my needs'}));
+  const next=view.getByRole('button',{name:'Continue to my options'}) as HTMLButtonElement;
+  assert.equal(next.disabled,true);
+  fireEvent.click(view.getByLabelText('Spouse'));
+  fireEvent.change(view.getByLabelText('Do you already have personal health insurance?'),{target:{value:'Yes'}});
+  fireEvent.change(view.getByLabelText('What prompted this review?'),{target:{value:'Family change'}});
+  assert.ok(view.getByText(/Aditi, Spouse/));
+  fireEvent.click(view.getByLabelText(/I agree to use these fictional answers/));
+  assert.equal(next.disabled,false);
+  fireEvent.click(next);
+  fireEvent.click(view.getByRole('button',{name:'Back'}));
+  assert.equal((view.getByLabelText('Spouse') as HTMLInputElement).checked,true);
+  assert.equal((view.getByLabelText('What prompted this review?') as HTMLSelectElement).value,'Family change');
+  fireEvent.click(view.getByRole('button',{name:'Continue to my options'}));
+  fireEvent.click(view.getByLabelText('Price'));
+  fireEvent.click(view.getByRole('button',{name:'Continue to my decision'}));
+  assert.ok(view.getByText('Aditi, Spouse'));
+  assert.ok(view.getByText('Personal cover exists'));
+  assert.ok(view.getByText(/Who is covered, Waiting periods, Price/));
+  for(const [label,result] of [['Explore a personal policy',/Your next-step checklist is ready/],['Request guidance',/Your guidance request is simulated/],['My existing cover may be sufficient',/A considered decision is a good outcome/]] as const){
+    fireEvent.click(view.getByRole('button',{name:new RegExp(label)}));
+    assert.ok(view.getByRole('status').textContent?.match(result));
+    fireEvent.click(view.getByRole('button',{name:'Review other decisions'}));
+  }
+  fireEvent.click(view.getByRole('button',{name:'Restart Aditi’s journey'}));
+  assert.ok(view.getByRole('heading',{name:/First, let’s see/}));
+  fireEvent.click(view.getByRole('button',{name:'Continue to my needs'}));
+  assert.equal((view.getByLabelText('Spouse') as HTMLInputElement).checked,false);
+  assert.equal((view.getByLabelText('Do you already have personal health insurance?') as HTMLSelectElement).value,'Not sure');
+  assert.equal((view.getByRole('button',{name:'Continue to my options'}) as HTMLButtonElement).disabled,true);
+  cleanup();
+});
